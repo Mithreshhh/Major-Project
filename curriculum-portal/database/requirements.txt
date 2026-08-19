@@ -1,2 +1,6 @@
 psycopg2-binary==2.9.9
 python-dotenv==1.0.1
+
+# PDF text extraction, used by extract_nep_chapter.py to pull Part II
+# (Higher Education) out of the NEP 2020 policy document.
+pymupdf==1.24.9
