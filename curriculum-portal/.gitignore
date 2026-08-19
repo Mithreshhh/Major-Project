@@ -1,0 +1,19 @@
+# Node
+node_modules/
+dist/
+
+# Uploaded syllabus files
+backend/uploads/
+
+# Python
+__pycache__/
+*.pyc
+venv/
+.venv/
+
+# Env files
+.env
+
+# OS
+.DS_Store
+Thumbs.db
