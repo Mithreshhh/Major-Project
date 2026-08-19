@@ -80,12 +80,26 @@ pip install -r requirements.txt
 
 # Job-market skills, from a real O*NET "Technology Skills" export.
 # Required — the nlp-engine reports itself "not ready" while this is empty.
+# Download the tab-delimited O*NET database from https://www.onetcenter.org/database.html
+# and put "Technology Skills.txt" in this directory.
 python import_onet.py --file "Technology Skills.txt"
 
-# NEP competency reference set. Ships with the repo, no download needed.
+# NEP competency reference set, derived from the policy document itself.
 # Safe to re-run; use --truncate to replace an edited set.
 python seed_nep.py
 ```
+
+The NEP competencies come from **Part II (Higher Education), sections 9–19 of NEP 2020**,
+extracted from the official PDF at the repo root:
+
+```bash
+python extract_nep_chapter.py     # NEP_Final_English_0.pdf -> nlp-engine/data/nep_2020_higher_education.txt
+```
+
+That text file is committed, so you only need to re-run the extractor if you replace the
+PDF. Every competency in `seed_nep.py` cites the policy paragraph it came from, and
+`seed_nep.py` verifies those citations against the extracted text each time it runs —
+a mismatch is reported rather than silently seeded.
 
 ---
 
