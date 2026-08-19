@@ -1,0 +1,114 @@
+.dashboard-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.empty-state {
+  margin-top: 2rem;
+  padding: 3.5rem 2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.empty-state__title {
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.empty-state__hint {
+  margin-top: 0.4rem;
+  font-size: 0.9rem;
+}
+
+.report-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1.1rem;
+  margin-top: 2rem;
+}
+
+.report-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  padding: 1.5rem;
+  text-align: left;
+  cursor: pointer;
+  background: var(--bg-panel);
+  color: inherit;
+  font: inherit;
+}
+
+.report-card__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.report-card__filename {
+  font-weight: 600;
+  font-size: 0.98rem;
+  word-break: break-word;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+}
+
+.report-card__score {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.4rem;
+  flex-shrink: 0;
+}
+
+.report-card.tone-good .report-card__score {
+  color: var(--color-success);
+}
+
+.report-card.tone-mid .report-card__score {
+  color: var(--color-warning);
+}
+
+.report-card.tone-bad .report-card__score {
+  color: var(--color-danger);
+}
+
+.report-card__bar {
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--bg-panel-strong);
+  overflow: hidden;
+}
+
+.report-card__bar-fill {
+  height: 100%;
+  border-radius: var(--radius-pill);
+  transition: width 0.8s var(--ease-out);
+}
+
+.report-card.tone-good .report-card__bar-fill {
+  background: var(--color-success);
+}
+
+.report-card.tone-mid .report-card__bar-fill {
+  background: var(--color-warning);
+}
+
+.report-card.tone-bad .report-card__bar-fill {
+  background: var(--color-danger);
+}
+
+.report-card__meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
