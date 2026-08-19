@@ -162,19 +162,60 @@ made matching *worse* (top-5 similarities dropped from 0.617/0.612/0.604/0.504/0
 sentence dilutes the embedding when the other side is a 2-4 word noun phrase. The
 `description` column is retained for display purposes, not matching.
 
-**Known limitation — NEP scores read low, and the 0.6 threshold is the reason.** That
-threshold was tuned (§ above) on job-market skills, where both sides are concrete noun
-phrases. NEP competencies are abstract capability statements ("Critical thinking and
-problem solving") being compared against concrete syllabus topics, and the abstraction
-gap costs real similarity: on a measured sample, genuine matches landed just over the
-line (0.617 "Vocational skills and hands-on experience" ↔ "hands-on experience", 0.612
-"Computational thinking" ↔ "core computer science subjects") while plausible ones fell
-short (0.357 "Critical thinking and problem solving" against a CS document). Dropping the
-threshold to 0.45 admits as much noise as signal (0.451 "Creativity and innovation" ↔
-"Institution Innovation Council" is a name collision, not a competency match). Left at
-0.6 deliberately: a separate, lower NEP threshold is defensible but shouldn't be picked
-without evaluation data, and inventing one to make the gauge look better would be tuning
-for appearance.
+**The competency set is derived from the policy document itself, not authored.** An
+earlier revision seeded a plausible-looking starter list written from general knowledge
+of NEP 2020. That was replaced: `extract_nep_chapter.py` pulls Part II (Higher
+Education, sections 9–19) out of the official PDF into
+`nlp-engine/data/nep_2020_higher_education.txt`, and every one of the 37 rows in
+`seed_nep.py` cites the policy paragraph it comes from. `seed_nep.py` re-checks those
+citations against the extracted text on every run, so the set can't quietly drift from
+its source. A reference table that scores real institutions' curricula should be
+traceable to the actual policy, not to a language model's recollection of it.
+
+**Structural provisions are the *source* of competencies but aren't rows themselves.**
+The sections on flexible curricula and credit systems (11.5, 11.9, 12.2, 16.8) describe
+the Academic Bank of Credit, multiple entry/exit points, and criterion-based grading. A
+syllabus cannot "cover" the Academic Bank of Credit, so seeding those as competencies
+would manufacture permanently-unmatched rows that drag the score down without meaning
+anything. What those paragraphs *do* yield is curriculum-visible capability —
+multidisciplinary breadth, disciplinary depth, research project experience, lifelong
+learning, credit-bearing internships — and that's what was taken from them.
+
+**Part II only — digital literacy is deliberately absent.** It's a genuine NEP
+competency, but it lives in sections 23–24 (Part III), outside the Higher Education
+chapter. Adding it would mean inventing a citation, so it was left out and the boundary
+documented instead.
+
+**NEP competencies are embedded by name alone, not name + description** — decided by
+measurement. The obvious improvement was to embed the richer `"{name}. {description}"`
+text. Tested against a real document it made matching *worse* (top-5 similarities fell
+from 0.617/0.612/0.604/0.504/0.451 to 0.557/0.541/0.491/0.469/0.418): a long descriptive
+sentence dilutes the embedding when the other side is a 2–4 word noun phrase. The
+`description` column is kept for display and provenance, not matching.
+
+**Known limitation — binary coverage is the wrong shape for NEP, and the real
+competency set makes that unmistakable.** Measured against `sample_syllabus.docx` (a
+purely technical CS syllabus: Python, data structures, algorithms, SQL, React, AWS), the
+policy-derived set scores **0.0 — zero of 37 competencies covered at the 0.6 threshold**.
+
+That zero is, strictly, *correct*: this syllabus genuinely teaches no ethical reasoning,
+community engagement, environmental education, or multilingualism, and NEP's whole point
+is that such a curriculum isn't holistic. It's a true negative, not a bug.
+
+But it's a nearly useless *signal*, because it can't tell a slightly-holistic curriculum
+from a completely technical one — and the underlying similarities plainly can: they range
+from 0.463 ("Analytical reasoning" ↔ "algorithms") down to 0.16, and the binary threshold
+throws that ordering away. The 0.6 cut was tuned on job-market skills, where both sides
+are concrete noun phrases; NEP competencies are abstract capability statements, and the
+abstraction gap costs ~0.15–0.2 similarity across the board.
+
+Lowering the threshold is the tempting fix and the wrong one — at 0.45 this syllabus
+scores 5.4%, still uninformative, while admitting matches like "Creativity and
+innovation" ↔ "Institution Innovation Council", a name collision. **The real fix is to
+stop thresholding NEP at all**: report a graded score (mean best-match similarity, or a
+soft coverage curve) so partial alignment is visible. That's a scoring-semantics change
+that alters every stored `nep_score`, so it wasn't made unilaterally — it's the
+recommended next step, not a silent one. Left binary and honest in the meantime.
 
 **Models are preloaded at startup in a background thread, not lazily on first request:**
 Loading spaCy + Sentence-BERT takes ~10-30s (measured: 12s warm). Lazily, that cost lands
@@ -387,3 +428,16 @@ Test artifacts were removed afterwards — the syllabi/gap_reports rows and uplo
 created during verification, and a temporary `job_skills` set inserted to make the real
 end-to-end run possible. The `nep_competencies` seed was kept, since it's a deliverable
 rather than test data.
+
+**The NEP competency set was likewise measured, not assumed.** The extraction was checked
+against the source: all 11 section headings present, 10,719 words, the chapter ending
+exactly at paragraph 19.5 with no Part III bleed. An early version of the extractor
+de-hyphenated line breaks and produced "peerreviewed" and "sociallyconscious"; inspecting
+all nine line-ending hyphens in the chapter showed every one was a real compound, so the
+rule was inverted to preserve them. All 37 citations were verified to resolve against the
+extracted text, and the seeder re-checks them on every run.
+
+Scoring the real set against `sample_syllabus.docx` is what surfaced the binary-threshold
+limitation documented in §4 — a 0.0 score that is correct and useless at the same time.
+That was only visible by running it against a real competency set and a real syllabus;
+the earlier starter list scored 15% on a résumé and looked fine.
