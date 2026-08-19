@@ -155,6 +155,47 @@ def compute_gap_analysis(
     }
 
 
+def compute_nep_alignment(
+    syllabus_skills: list, nep_competencies: list, threshold: float = DEFAULT_SIMILARITY_THRESHOLD
+) -> dict:
+    """
+    Compare a syllabus's skill phrases against the NEP competency reference
+    set (nep_competencies table).
+
+    This is compute_gap_analysis() read the other way round: where gap_score
+    counts what's *missing* (higher = worse), nep_score counts what's
+    *covered* (higher = better), because "NEP alignment" is naturally phrased
+    as a positive. The frontend renders it with the gauge's `invert` flag for
+    exactly that reason.
+
+    Returns:
+        {
+            "covered_competencies": [NEP competencies the syllabus teaches],
+            "missing_competencies": [NEP competencies it doesn't],
+            "nep_score": float | None,  # 0-100, higher = better alignment
+            "details": [per-competency match info],
+        }
+
+    nep_score is None when there are no competencies to score against — an
+    unseeded nep_competencies table means "unknown", not "perfectly aligned".
+    """
+    if not _dedupe_clean(nep_competencies):
+        return {
+            "covered_competencies": [],
+            "missing_competencies": [],
+            "nep_score": None,
+            "details": [],
+        }
+
+    analysis = compute_gap_analysis(syllabus_skills, nep_competencies, threshold)
+    return {
+        "covered_competencies": analysis["matched_skills"],
+        "missing_competencies": analysis["unmatched_skills"],
+        "nep_score": round(100.0 - analysis["gap_score"], 2),
+        "details": analysis["details"],
+    }
+
+
 # ---------------------------------------------------------------------------
 # Self-test
 # ---------------------------------------------------------------------------
@@ -176,6 +217,14 @@ SAMPLE_JOB_SKILLS = [
     "Machine learning",
     "React",
     "Kubernetes",
+]
+
+SAMPLE_NEP_COMPETENCIES = [
+    "Computational thinking",
+    "Critical thinking and problem solving",
+    "Digital literacy",
+    "Environmental awareness and sustainability",
+    "Ethical reasoning",
 ]
 
 
@@ -221,6 +270,28 @@ def test_gap_analysis_sanity():
     print("Self-test passed: gap analysis returns a sane result.")
 
 
+def test_nep_alignment_sanity():
+    """NEP alignment should score coverage (higher = better) and stay in range."""
+    result = compute_nep_alignment(SAMPLE_SYLLABUS_SKILLS, SAMPLE_NEP_COMPETENCIES)
+
+    print("\nNEP alignment result:")
+    print(f"  Covered:   {result['covered_competencies']}")
+    print(f"  Missing:   {result['missing_competencies']}")
+    print(f"  NEP score: {result['nep_score']}%")
+
+    assert 0 <= result["nep_score"] <= 100
+    covered = len(result["covered_competencies"])
+    total = len(SAMPLE_NEP_COMPETENCIES)
+    assert result["nep_score"] == round(covered / total * 100, 2), "nep_score must be % covered"
+
+    # An unseeded competency table is "unknown", not "100% aligned".
+    empty = compute_nep_alignment(SAMPLE_SYLLABUS_SKILLS, [])
+    assert empty["nep_score"] is None, "Expected None nep_score with no competencies to score against"
+
+    print("Self-test passed: NEP alignment scores coverage correctly.")
+
+
 if __name__ == "__main__":
     test_cosine_similarity_sanity()
     test_gap_analysis_sanity()
+    test_nep_alignment_sanity()
