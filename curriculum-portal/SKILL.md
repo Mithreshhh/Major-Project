@@ -134,9 +134,68 @@ would add operational complexity (worker process, job status polling, a message 
 for no real benefit yet. Worth revisiting if syllabi start requiring long-running batch
 analysis.
 
+**NEP scoring reuses the same matcher, inverted — `compute_nep_alignment()` wraps
+`compute_gap_analysis()`:** `nep_score` is the percentage of NEP competencies the
+syllabus *covers* (higher is better), where `gap_score` is the percentage of job skills
+it *misses* (higher is worse). Same embeddings, same threshold, opposite polarity — so
+the two numbers are computed by one code path rather than two implementations that could
+drift. The polarity flip is what the frontend gauge's existing `invert` flag was already
+built for.
+
+**An unseeded `nep_competencies` table yields `null`, not `0` or `100`:** Scoring a
+syllabus against an empty competency set is arithmetically "0 missing out of 0", which
+`compute_gap_analysis()` would report as a 0% gap — i.e. a perfect 100% NEP score for a
+table with nothing in it. `compute_nep_alignment()` intercepts that case and returns
+`None`, which becomes SQL `NULL` in `gap_reports.nep_score`. "We didn't measure this" and
+"we measured this and it's perfect" must not look the same in the database.
+
+**NEP failures degrade instead of failing the request:** `/analyze` returns a gap score
+even if NEP scoring throws or the table is empty. The job-market gap analysis is the
+endpoint's reason to exist and is the expensive part; losing the whole response over a
+secondary signal would trade the caller's main result for a null they'd have tolerated.
+
+**NEP competencies are embedded by name alone, not name + description** — decided by
+measurement, not intuition. The obvious improvement was to embed the richer
+`"{name}. {description}"` text from the seed data. Tested against a real document, it
+made matching *worse* (top-5 similarities dropped from 0.617/0.612/0.604/0.504/0.451 to
+0.557/0.541/0.491/0.469/0.418, and the score fell from 15% to 0%): a long descriptive
+sentence dilutes the embedding when the other side is a 2-4 word noun phrase. The
+`description` column is retained for display purposes, not matching.
+
+**Known limitation — NEP scores read low, and the 0.6 threshold is the reason.** That
+threshold was tuned (§ above) on job-market skills, where both sides are concrete noun
+phrases. NEP competencies are abstract capability statements ("Critical thinking and
+problem solving") being compared against concrete syllabus topics, and the abstraction
+gap costs real similarity: on a measured sample, genuine matches landed just over the
+line (0.617 "Vocational skills and hands-on experience" ↔ "hands-on experience", 0.612
+"Computational thinking" ↔ "core computer science subjects") while plausible ones fell
+short (0.357 "Critical thinking and problem solving" against a CS document). Dropping the
+threshold to 0.45 admits as much noise as signal (0.451 "Creativity and innovation" ↔
+"Institution Innovation Council" is a name collision, not a competency match). Left at
+0.6 deliberately: a separate, lower NEP threshold is defensible but shouldn't be picked
+without evaluation data, and inventing one to make the gauge look better would be tuning
+for appearance.
+
+**Models are preloaded at startup in a background thread, not lazily on first request:**
+Loading spaCy + Sentence-BERT takes ~10-30s (measured: 12s warm). Lazily, that cost lands
+on whoever uploads first, looking indistinguishable from a hang. Warming in a daemon
+thread from the FastAPI lifespan hook lets uvicorn bind its port immediately — so
+`/health` is answerable *during* warmup and can report `models: "loading"` — while the
+backend simply refuses uploads until it flips to ready. `WARM_MODELS_ON_STARTUP=false`
+restores lazy loading.
+
+**`/health` returns 200 even when not ready, with readiness in the body:** The convention
+would be 503 for "up but not ready". Rejected here because the caller that matters most
+is the backend, and it needs to tell "the NLP engine isn't running" (connection refused)
+apart from "it's up and loading models" — two states that both produce a non-200 under
+the conventional design, but call for different messages. Reaching the handler at all is
+the liveness answer; `ready` plus per-dependency `checks` carries the rest. The backend's
+own `/api/health/nlp` *does* use 503, because there the caller is a human or a probe
+script that wants to act on the status code alone.
+
 ---
 
-## 5. Backend — auth, upload, and the mock/real analysis boundary
+## 5. Backend — auth, upload, and the nlp-engine integration
 
 **bcrypt (native) over bcryptjs (pure JS):** The user's request named `bcrypt` explicitly.
 It was verified to actually install and load its native binding cleanly in this
@@ -159,14 +218,47 @@ the runtime would be unjustified weight. This does mean the project implicitly r
 Node ≥18 (where `fetch`/`FormData` first landed as globals); documented via `engines` in
 `package.json`.
 
-**`analyzeSubmission()` as a mock/real toggle behind `USE_MOCK_ANALYSIS`, not two separate
-code paths the caller chooses between:** The task explicitly asked for mock data now with
-a clear marker for where the real integration goes later. Rather than just leaving a
-comment, the real nlp-engine integration (file upload, response shape adaptation) is
-*already implemented* in the same file, gated by one env var — flipping
-`USE_MOCK_ANALYSIS=false` is the entire migration, no code changes needed. This was
-possible because the real integration already existed from an earlier iteration of
-`/upload` (before auth was added) and was preserved rather than deleted.
+**`USE_MOCK_ANALYSIS` removed entirely, not left as a fallback:** `analyzeSubmission()`
+originally returned fixed mock data behind an env flag, with the real integration
+implemented alongside it. Now that the real call is the only path, the flag is gone
+rather than kept as a "degrade to mock if the NLP engine is down" escape hatch. Mock
+data that silently reaches `gap_reports` is worse than a failed upload: a stored 72%
+gap score is indistinguishable from a real one once it's in the table, and every
+consumer downstream (dashboard, report page, any future analytics) would treat it as
+genuine. An upload that fails loudly with a 503 is recoverable; a database full of
+plausible fiction is not.
+
+**Talking to the nlp-engine lives in `services/nlpClient.js`, not inline in
+`analyzeSubmission()`:** Three separate concerns needed to share it — the upload route's
+pre-flight check, the analysis call itself, and the `/api/health/nlp` endpoint. Keeping
+timeouts, error classification, and the health-result cache in one module means those
+three agree by construction. `analyzeSubmission()` is left as what it says it is: the
+adapter from the engine's `snake_case` response to this app's `camelCase` shape.
+
+**Failures are classified by `code`, not collapsed into one 502:** The original code
+returned 502 for every analysis failure. But "the NLP service is down" (503, retry
+later), "it didn't answer in time" (504), and "your PDF has no extractable text" (422)
+are three different answers, and only the last is the user's to act on. Each
+`NlpServiceError` carries a code that maps to a status and a user-facing headline, so
+the upload page can say something true. All five paths were verified against a stub
+engine rather than reasoned about — see §7.
+
+**Uploads are gated on an NLP health check that runs *before* multer reads the body:**
+The check sits in the route handler ahead of `upload.single()`, so when the engine is
+down the request is rejected without a 10MB file ever being written to disk. This
+matters most in the normal case, not the pathological one: the engine takes ~10-30s to
+load its models at startup, and without the gate every upload in that window would
+upload fully, then fail. Health results are cached for a few seconds
+(`NLP_HEALTH_CACHE_MS`) so a burst of uploads doesn't probe once per request, and the
+cache is invalidated the moment an analyze call fails — a stale "healthy" belief is the
+one thing the cache must never outlive.
+
+**Two timeouts, not one:** `NLP_ANALYZE_TIMEOUT_MS` defaults to 120s and
+`NLP_HEALTH_TIMEOUT_MS` to 3s, because they bound opposite risks. The analyze timeout
+guards against a *slow but working* engine — set it too low and a cold-start model load
+turns into a failed upload. The health timeout is paid before every upload, so it's the
+delay a user sits through to learn the service is down; that one wants to be short. A
+single shared value would have to be wrong for one of them.
 
 **`GET /report/:id` returns 404 for another institute's report, not 403:** A 403 confirms
 "this resource exists but isn't yours," which leaks information (report ID enumeration
@@ -225,7 +317,47 @@ production.
 
 ---
 
-## 7. What was actually verified vs. assumed
+## 7. Startup scripts — `start-all.ps1` / `start-all.sh`
+
+**Shell scripts, not a root `package.json` with `concurrently`:** The npm approach is the
+common one, but it would add a fourth `node_modules` at the repo root and a dependency,
+purely to launch processes — and it still couldn't do the part that actually matters
+here: creating a Python venv, installing pip requirements, or downloading the spaCy
+model. A script that can only start two of the three services isn't the "one command" the
+task asked for. Two hand-written scripts have no install step of their own and can drive
+Python and Node equally.
+
+**Both a PowerShell and a bash version, rather than one cross-platform runner:** The
+development environment is Windows, so PowerShell is the primary target; the differences
+that matter (`venv\Scripts\python.exe` vs `venv/bin/python`, `taskkill /T` vs signals,
+`/dev/tcp` vs `System.Net.Sockets.TcpClient`) are exactly the ones a shared abstraction
+would have to paper over. Two idiomatic scripts are shorter and more debuggable than one
+that's awkward on both platforms.
+
+**Services start sequentially, gated on health, not all at once:** Launching all three in
+parallel is faster and was the first instinct — but the failure it produces is a frontend
+that loads fine against a backend whose NLP engine is still warming, which surfaces as a
+confusing failed upload rather than a startup error. Waiting on each service's health
+endpoint makes startup order a property of the script rather than something the user has
+to get right. `-NoHealthWait` / `--no-health-wait` opts out.
+
+**Postgres is deliberately *not* started by the script:** It's a system service or a
+Docker container with a lifecycle that outlives a dev session, and it may already be
+running with data in it. Starting or (worse) initializing it from a convenience script
+risks acting on the wrong instance. Instead the nlp-engine's readiness check reports
+whether the database is reachable and seeded, so a database problem shows up as a named
+check rather than a silent hang.
+
+**Services are launched via their real binaries (`node`, `node vite.js`), not
+`npm run dev`:** `npm` on Windows wraps the real process in a `cmd.exe` shell, so killing
+the npm process can orphan the server it spawned — which then holds port 4000 and makes
+the next run fail with `EADDRINUSE`. Invoking `node` directly makes the tracked PID the
+actual server, so Ctrl+C cleanup is reliable. The scripts also pre-check that 8000/4000/
+5173 are free and refuse to start rather than half-starting into that error.
+
+---
+
+## 8. What was actually verified vs. assumed
 
 Every claim above about "verified in practice" refers to real command execution recorded
 in this session — a throwaway Docker Postgres container, both services actually started,
@@ -235,3 +367,23 @@ the initial plain-CSS upload page, and the first pass of the dark-theme UI (whic
 surfaced the `text-decoration` underline bug — a real defect that automated build/API
 testing cannot catch, since it's a rendering-only issue). That gap is the reason a
 Playwright-driven visual check was added for this revision.
+
+**The nlp-engine integration was verified the same way.** Every failure path was
+exercised against a stub nlp-engine that could be put into each failure mode on demand,
+because the interesting cases (timeout, malformed payload, dependency missing) are ones a
+correctly-working service never produces. Confirmed by observation, not inspection: 503
+pre-flight rejection with the engine stopped and with it reporting `ready: false`, 504 on
+a `/analyze` that never answers, 422 on an upstream file rejection, 502 on both an
+upstream 500 and an unparseable payload, and 201 storing real values on success.
+
+The real engine was then run end to end — spaCy and Sentence-BERT actually loaded, a real
+`.docx` extracted, matched, scored, written to `gap_reports`, and read back through
+`GET /api/report/:id`. Two findings came out of running it rather than reasoning about
+it: the ~12-second window where `/health` reports `models: "loading"` (which is the whole
+justification for the upload gate), and the NEP threshold measurements in §4 that
+overturned the assumption that richer competency text would match better.
+
+Test artifacts were removed afterwards — the syllabi/gap_reports rows and uploaded files
+created during verification, and a temporary `job_skills` set inserted to make the real
+end-to-end run possible. The `nep_competencies` seed was kept, since it's a deliverable
+rather than test data.
