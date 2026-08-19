@@ -11,6 +11,37 @@ Each later service depends on the one(s) before it being up.
 
 ---
 
+## Quickstart — all three app services in one command
+
+Set up the database first (step 1 below — it has its own lifecycle and isn't
+started by the script), then:
+
+```powershell
+# Windows / PowerShell
+.\start-all.ps1 -Install     # first run only: venv, pip, spaCy model, npm install
+.\start-all.ps1              # every run after that
+```
+
+```bash
+# macOS / Linux
+./start-all.sh --install     # first run only
+./start-all.sh               # every run after that
+```
+
+This starts **nlp-engine → backend → frontend** in dependency order, waiting for
+each to report healthy before starting the next, and prints where everything is
+listening. Ctrl+C once stops all three.
+
+Because the nlp-engine loads spaCy and Sentence-BERT before it can answer, the
+first start takes ~10-30 seconds (and longer the very first time, when the
+models are downloaded). The script shows what it's waiting on rather than
+failing.
+
+The rest of this file is the manual, service-by-service version — useful when
+you want to run just one service, or when the script reports a problem.
+
+---
+
 ## 1. Database
 
 Create the database and apply the schema:
@@ -40,11 +71,20 @@ docker exec curriculum-portal-pg psql -U postgres -d curriculum_portal -f /schem
 > fine, this is almost always why. Fix: map the container to a different host port (e.g.
 > `-p 5433:5432`) and point `DATABASE_URL` at that port instead.
 
-Optional — seed `job_skills` from a real O*NET export:
+**Seed the two reference tables.** These are not optional any more — analysis
+scores a syllabus *against* them, so `/analyze` refuses to run without
+`job_skills`, and `nep_score` comes back `null` without `nep_competencies`:
 
 ```bash
 pip install -r requirements.txt
+
+# Job-market skills, from a real O*NET "Technology Skills" export.
+# Required — the nlp-engine reports itself "not ready" while this is empty.
 python import_onet.py --file "Technology Skills.txt"
+
+# NEP competency reference set. Ships with the repo, no download needed.
+# Safe to re-run; use --truncate to replace an edited set.
+python seed_nep.py
 ```
 
 ---
@@ -61,10 +101,36 @@ python -m spacy download en_core_web_sm
 uvicorn app.main:app --reload --port 8000
 ```
 
-Verify: `curl http://localhost:8000/health` → `{"status":"ok"}`
+Verify: `curl http://localhost:8000/health`
 
-This service is independent — it doesn't know the backend exists. The backend calls it
-over HTTP (see `NLP_ENGINE_URL` below), and only when `USE_MOCK_ANALYSIS=false`.
+`/health` is a **readiness** check, not just a ping. It reports whether the NLP
+models have finished loading, whether the database is reachable, and whether the
+reference tables are seeded:
+
+```json
+{
+  "status": "ok",
+  "ready": true,
+  "checks": {
+    "models":           { "status": "ok" },
+    "database":         { "status": "ok" },
+    "job_skills":       { "status": "ok", "count": 412 },
+    "nep_competencies": { "status": "ok", "count": 20 }
+  }
+}
+```
+
+`ready` is false for the first ~10-30 seconds while spaCy and Sentence-BERT
+load (`models: "loading"`) — that's normal, and the backend refuses uploads
+until it flips true. If a check stays wrong, the `status`/`detail` on that check
+names the fix. Set `WARM_MODELS_ON_STARTUP=false` to skip preloading and load
+models lazily on first request instead.
+
+Note `nep_competencies: "empty"` is *degraded, not unready*: analysis still runs
+and returns a gap score, just with a `null` NEP score.
+
+This service is independent — it doesn't know the backend exists. The backend
+calls it over HTTP (see `NLP_ENGINE_URL` below).
 
 ---
 
@@ -97,10 +163,29 @@ This creates:
 
 Safe to re-run — an existing email is skipped, not duplicated.
 
-**Mock vs. real analysis:** `USE_MOCK_ANALYSIS=true` (the `.env.example` default) makes
-`POST /upload` return fixed mock data without needing `nlp-engine` running at all — good
-for frontend-only work. Set it to `false` once `nlp-engine` (step 2) is up, to get real
-skill extraction + job-market matching. See `backend/services/analyzeSubmission.js`.
+**Health endpoints:**
+
+| Endpoint | Answers |
+|---|---|
+| `GET /api/health` | Is the backend up? (no dependencies touched) |
+| `GET /api/health/nlp` | Is the NLP engine up and able to analyze? `200` ready, `503` not |
+| `GET /api/health/full` | Backend + Postgres + NLP engine in one call |
+
+`GET /api/health/nlp` is the one to check before uploading — it's the same check
+`POST /api/upload` runs internally.
+
+**Uploads are gated on NLP readiness.** `POST /api/upload` health-checks the NLP
+engine *before* reading the uploaded file, so a down or still-warming service
+costs you an immediate `503` instead of a full upload that then fails. Set
+`REQUIRE_NLP_READY=false` to skip the pre-flight and let the analyze call itself
+surface the failure.
+
+**Timeouts** are configurable in `.env` — `NLP_ANALYZE_TIMEOUT_MS` (default
+120000, generous because a cold engine loads models first) and
+`NLP_HEALTH_TIMEOUT_MS` (default 3000, kept short since it runs before uploads).
+
+There is no mock-analysis mode: `POST /api/upload` always calls the real
+nlp-engine. See `backend/services/analyzeSubmission.js` and `nlpClient.js`.
 
 ---
 
@@ -120,7 +205,14 @@ dev (see `vite.config.js`) — no CORS setup needed locally.
 
 ## Walking the full flow
 
-With all four services up (steps 1–4):
+With all four services up (steps 1–4, or the Quickstart script). Confirm
+everything is actually wired up first:
+
+```bash
+curl http://localhost:4000/api/health/full     # expect "ready": true
+```
+
+Then: 
 
 1. Open `http://localhost:5173` → redirected to **/login**.
 2. Click either demo-account button (or sign up your own institute).
@@ -139,10 +231,26 @@ you out; log back in with the same demo button or your own credentials.
 
 ## Troubleshooting
 
+Upload failures carry a `code` and a `details` field naming the actual cause —
+check those first. The status code tells you whose problem it is:
+
+| Status | `code` | Meaning |
+|---|---|---|
+| 503 | *(pre-flight)* | NLP engine down or not ready — uploads paused before the file was read |
+| 503 | `NLP_UNAVAILABLE` | NLP engine is up, but its database or seed data isn't |
+| 504 | `NLP_TIMEOUT` | NLP engine accepted the request but didn't answer in time |
+| 422 | `NLP_REJECTED_FILE` | Your file — wrong type, empty, or no extractable skills |
+| 502 | `NLP_ERROR` / `NLP_BAD_RESPONSE` | NLP engine failed internally or returned an unusable payload |
+
 | Symptom | Likely cause |
 |---|---|
-| `POST /api/upload` → 401 | Not logged in, or logged-in session was cleared by a page refresh |
-| `POST /api/upload` → 502 "Failed to analyze syllabus" | `USE_MOCK_ANALYSIS=false` but `nlp-engine` isn't running/reachable |
+| `POST /api/upload` → 401 | Not logged in, or the session was cleared by a page refresh |
+| `POST /api/upload` → 503 "uploads are paused" | `nlp-engine` isn't running, or is still loading models. Check `GET /api/health/nlp` |
+| `/health` shows `job_skills: empty` | `import_onet.py` hasn't been run — `/analyze` can't score anything |
+| Report shows a blank NEP gauge | `nep_competencies` is empty — run `python database/seed_nep.py` |
+| `/health` shows `database: error` but the backend works fine | The two services point at **different** Postgres instances — compare `DATABASE_URL` in `backend/.env` and `nlp-engine/.env`, and see the Windows port gotcha in step 1 |
+| `/health` shows `models: error` | The spaCy model isn't installed — `python -m spacy download en_core_web_sm` |
+| First upload after startup times out | Models were still loading. Wait for `ready: true`, or raise `NLP_ANALYZE_TIMEOUT_MS` |
 | `GET /api/report/:id` → 404 for a report you just created | You're logged into a different institute than the one that uploaded it |
 | Backend can't connect to Postgres | Check the Windows port-conflict gotcha in step 1 |
 | `EADDRINUSE` on 4000/8000/5173 | A previous run of that service is still listening — stop it before restarting |
