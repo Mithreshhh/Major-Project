@@ -1,22 +1,65 @@
+import logging
 import os
 import tempfile
 from pathlib import Path
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
 
-from app.db import fetch_job_skills
-from app.matching_engine import DEFAULT_SIMILARITY_THRESHOLD, compute_gap_analysis
+from app.db import fetch_job_skills, fetch_nep_competencies
+from app.matching_engine import (
+    DEFAULT_SIMILARITY_THRESHOLD,
+    compute_gap_analysis,
+    compute_nep_alignment,
+)
 from app.skill_extraction import extract_skills_from_file
+
+logger = logging.getLogger("nlp-engine.analyze")
 
 router = APIRouter()
 
 SUPPORTED_EXTENSIONS = {".pdf", ".docx"}
 
 
+def _compute_nep_alignment_or_none(extracted_skills: list) -> dict:
+    """
+    Score the syllabus against the NEP competency set, degrading to a null
+    score rather than failing the request.
+
+    NEP alignment is a secondary signal: job-market gap analysis is what
+    /analyze exists for, and an unseeded nep_competencies table or a
+    transient failure scoring it shouldn't cost the caller the gap analysis
+    it already paid for. A null nep_score reads as "not scored" everywhere
+    downstream (the backend stores NULL, the frontend renders an empty
+    gauge), which is honest; inventing a number would not be.
+    """
+    empty = {"covered_competencies": [], "missing_competencies": [], "nep_score": None}
+    try:
+        competencies = fetch_nep_competencies()
+    except RuntimeError as exc:
+        logger.warning("Skipping NEP alignment - could not load nep_competencies: %s", exc)
+        return empty
+
+    if not competencies:
+        logger.warning(
+            "Skipping NEP alignment - nep_competencies is empty. "
+            "Run database/seed_nep.py to populate it."
+        )
+        return empty
+
+    try:
+        alignment = compute_nep_alignment(extracted_skills, competencies)
+    except (ValueError, RuntimeError) as exc:
+        logger.warning("Skipping NEP alignment - matching failed: %s", exc)
+        return empty
+
+    return alignment
+
+
 # POST /analyze
 # Ties skill_extraction.py + matching_engine.py together: given an uploaded
-# syllabus file, extract its skill phrases, compare them against the
-# job-market skill list (job_skills table), and return the gap analysis.
+# syllabus file, extract its skill phrases, compare them against both the
+# job-market skill list (job_skills table) and the NEP competency set
+# (nep_competencies table), and return the gap analysis plus NEP alignment.
 @router.post("/analyze")
 async def analyze_syllabus(file: UploadFile = File(...)):
     suffix = Path(file.filename or "").suffix.lower()
@@ -70,11 +113,18 @@ async def analyze_syllabus(file: UploadFile = File(...)):
     except (ValueError, RuntimeError) as exc:
         raise HTTPException(status_code=500, detail=f"Matching failed: {exc}") from exc
 
+    nep_alignment = _compute_nep_alignment_or_none(extracted_skills)
+
     return {
         "filename": file.filename,
         "extracted_skills": extracted_skills,
         "matched_skills": gap_analysis["matched_skills"],
         "unmatched_skills": gap_analysis["unmatched_skills"],
         "gap_score": gap_analysis["gap_score"],
+        # null when nep_competencies is unseeded or scoring it failed - see
+        # _compute_nep_alignment_or_none(). Higher is better, unlike gap_score.
+        "nep_score": nep_alignment["nep_score"],
+        "nep_covered_competencies": nep_alignment["covered_competencies"],
+        "nep_missing_competencies": nep_alignment["missing_competencies"],
         "similarity_threshold": DEFAULT_SIMILARITY_THRESHOLD,
     }
