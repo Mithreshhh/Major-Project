@@ -1,0 +1,116 @@
+.auth-page {
+  min-height: calc(100vh - 73px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 1.5rem;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 440px;
+  padding: 2.5rem;
+  animation: page-in 0.5s var(--ease-out);
+}
+
+.auth-card__header {
+  margin-bottom: 2rem;
+}
+
+.auth-card__title {
+  font-size: 1.7rem;
+  margin-bottom: 0.5rem;
+}
+
+.auth-card__subtitle {
+  font-size: 0.95rem;
+}
+
+.auth-card__footer {
+  margin-top: 1.5rem;
+  text-align: center;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.auth-card__footer a {
+  color: var(--accent);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.auth-card__footer a:hover {
+  text-decoration: underline;
+}
+
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  margin: 1.75rem 0 1.25rem;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border-subtle);
+}
+
+.demo-accounts {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.demo-account {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-void);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.2s var(--ease-out), background 0.2s var(--ease-out), transform 0.2s var(--ease-out);
+  color: var(--text-primary);
+}
+
+.demo-account:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: var(--bg-panel-strong);
+}
+
+.demo-account:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.demo-account__info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.demo-account__name {
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.demo-account__email {
+  font-size: 0.76rem;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.demo-account__go {
+  font-size: 1.1rem;
+  color: var(--accent);
+}
