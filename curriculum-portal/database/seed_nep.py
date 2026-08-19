@@ -62,9 +62,28 @@ from psycopg2.extras import execute_values
 
 load_dotenv(dotenv_path=Path(__file__).resolve().parent / ".env")
 
-DATABASE_URL = os.getenv(
-    "DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/curriculum_portal"
-)
+
+def database_url() -> str:
+    """
+    Resolve the connection string, accepting either convention.
+
+    DATABASE_URL wins if set, because that's what backend/.env and
+    nlp-engine/.env use and a single value is harder to get half-wrong.
+    Otherwise it's composed from the POSTGRES_* variables that
+    database/.env.example and import_onet.py already use, so both scripts in
+    this directory can share one .env.
+    """
+    explicit = os.getenv("DATABASE_URL")
+    if explicit:
+        return explicit
+
+    user = os.getenv("POSTGRES_USER", "postgres")
+    password = os.getenv("POSTGRES_PASSWORD", "postgres")
+    host = os.getenv("POSTGRES_HOST", "localhost")
+    port = os.getenv("POSTGRES_PORT", "5432")
+    name = os.getenv("POSTGRES_DB", "curriculum_portal")
+    return f"postgresql://{user}:{password}@{host}:{port}/{name}"
+
 
 SOURCE_TEXT = (
     Path(__file__).resolve().parent.parent / "nlp-engine" / "data" / "nep_2020_higher_education.txt"
@@ -369,10 +388,11 @@ def seed(truncate: bool = False) -> None:
         print(f"NOTE: {SOURCE_TEXT} not found - skipping citation check.")
         print("      Run extract_nep_chapter.py to regenerate it from the policy PDF.")
 
+    dsn = database_url()
     try:
-        conn = psycopg2.connect(DATABASE_URL)
+        conn = psycopg2.connect(dsn)
     except psycopg2.OperationalError as exc:
-        sys.exit(f"Could not connect to the database at {DATABASE_URL}: {exc}")
+        sys.exit(f"Could not connect to the database at {dsn}: {exc}")
 
     rows = [
         (name, f"{description} (NEP 2020, para {citation})", category)
