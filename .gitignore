@@ -1,0 +1,20 @@
+# Node
+node_modules/
+dist/
+
+# Uploaded syllabus files
+curriculum-portal/backend/uploads/*
+!curriculum-portal/backend/uploads/.gitkeep
+
+# Python
+__pycache__/
+*.pyc
+venv/
+.venv/
+
+# Env files
+.env
+
+# OS
+.DS_Store
+Thumbs.db
