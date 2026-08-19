@@ -10,7 +10,7 @@ curriculum-portal/
 ├── frontend/       React (Vite) app — syllabus upload page + report dashboard page
 ├── backend/        Node.js + Express API — /upload, /analyze, /report, /health routes
 ├── nlp-engine/     Python FastAPI service — skill extraction + semantic matching
-├── database/       PostgreSQL schema + reference-data seed scripts
+├── database/       PostgreSQL schema + reference-data extract/seed scripts
 ├── start-all.ps1   Start all three app services with one command (Windows)
 └── start-all.sh    Same, for macOS/Linux
 ```
@@ -50,8 +50,13 @@ score:
 cd database
 pip install -r requirements.txt
 python import_onet.py --file "Technology Skills.txt"   # job-market skills (O*NET export)
-python seed_nep.py                                      # NEP competency set (ships with repo)
+python seed_nep.py                                      # NEP competencies (from the policy PDF)
 ```
+
+The NEP competency set is derived from Part II (Higher Education) of the NEP 2020 policy
+document, extracted by `extract_nep_chapter.py` into
+`nlp-engine/data/nep_2020_higher_education.txt`; each competency cites the policy
+paragraph it came from.
 
 ### 2. Backend (Node.js + Express)
 
@@ -132,5 +137,6 @@ rendered on the report page.
 
 Known gaps: `POST /api/analyze` (analyze-by-id) is still a `501` stub, `extracted_skills`
 rows aren't persisted to their own table (the full payload lives in `reports.summary`
-JSONB), and NEP scores read low — see the threshold discussion in `SKILL.md` §4.
-Remaining `TODO` comments mark the rest.
+JSONB), and NEP scoring uses a binary similarity threshold that reports 0% for a purely
+technical syllabus — a correct but uninformative answer. See the graded-score
+recommendation in `SKILL.md` §4. Remaining `TODO` comments mark the rest.
