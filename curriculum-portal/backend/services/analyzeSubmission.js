@@ -1,69 +1,38 @@
-import fs from 'node:fs';
-
-import { NLP_ENGINE_URL, USE_MOCK_ANALYSIS } from '../config.js';
-
-const MOCK_ANALYSIS_RESULT = {
-  gapScore: 72,
-  matchedSkills: ['Data Structures', 'OOP'],
-  missingSkills: ['Cloud Computing', 'DevOps'],
-  nepScore: 65,
-};
+import { analyzeSyllabusFile } from './nlpClient.js';
 
 /**
  * Analyze a saved syllabus file and return its gap-analysis result.
  *
- * Currently returns fixed mock data (USE_MOCK_ANALYSIS=true by default, see
- * config.js) so /upload can be built and tested without the Python NLP
- * service running.
+ * Sends the file to the nlp-engine's /analyze endpoint and adapts the
+ * response to this app's camelCase shape. Throws NlpServiceError if the
+ * analysis can't be completed — see nlpClient.js for the failure codes and
+ * httpStatusForNlpError() for how routes turn them into status codes.
  *
- * TODO: real NLP service integration point. Set USE_MOCK_ANALYSIS=false and
- * this will call callRealAnalysisService() below, which POSTs the file to
- * nlp-engine's /analyze endpoint and adapts its response into this same
- * { gapScore, matchedSkills, missingSkills, nepScore } shape.
+ * @returns {Promise<{
+ *   extractedSkills: string[],   // skill phrases found in the syllabus
+ *   matchedSkills: string[],     // job-market skills the syllabus covers
+ *   missingSkills: string[],     // job-market skills it doesn't
+ *   gapScore: number,            // 0-100, % of job-market skills missing (lower is better)
+ *   nepScore: number | null,     // 0-100, % of NEP competencies covered (higher is better);
+ *                                //   null when nep_competencies isn't seeded
+ *   nepCoveredCompetencies: string[],
+ *   nepMissingCompetencies: string[],
+ *   similarityThreshold: number | null,
+ * }>}
  */
 export async function analyzeSubmission(filePath, originalName) {
-  if (USE_MOCK_ANALYSIS) {
-    return { ...MOCK_ANALYSIS_RESULT };
-  }
+  const data = await analyzeSyllabusFile(filePath, originalName);
 
-  return callRealAnalysisService(filePath, originalName);
-}
-
-/**
- * Real implementation: sends the syllabus file to the nlp-engine FastAPI
- * service and adapts its response. Not used while USE_MOCK_ANALYSIS=true.
- */
-async function callRealAnalysisService(filePath, originalName) {
-  const fileBuffer = fs.readFileSync(filePath);
-  const formData = new FormData();
-  formData.append('file', new Blob([fileBuffer]), originalName);
-
-  let response;
-  try {
-    response = await fetch(`${NLP_ENGINE_URL}/analyze`, {
-      method: 'POST',
-      body: formData,
-    });
-  } catch (networkErr) {
-    throw new Error(`Could not reach nlp-engine at ${NLP_ENGINE_URL}: ${networkErr.message}`);
-  }
-
-  if (!response.ok) {
-    let detail;
-    try {
-      detail = (await response.json()).detail;
-    } catch {
-      detail = await response.text();
-    }
-    throw new Error(`nlp-engine returned ${response.status}: ${detail}`);
-  }
-
-  const data = await response.json();
   return {
-    gapScore: data.gap_score,
+    extractedSkills: data.extracted_skills,
     matchedSkills: data.matched_skills,
     missingSkills: data.unmatched_skills,
-    // TODO: nep_score once NEP competency matching is implemented in nlp-engine
-    nepScore: null,
+    gapScore: data.gap_score,
+    // `?? null` keeps an nlp-engine that predates NEP scoring from writing
+    // `undefined` into gap_reports.nep_score.
+    nepScore: data.nep_score ?? null,
+    nepCoveredCompetencies: data.nep_covered_competencies ?? [],
+    nepMissingCompetencies: data.nep_missing_competencies ?? [],
+    similarityThreshold: data.similarity_threshold ?? null,
   };
 }
