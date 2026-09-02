@@ -1,0 +1,9 @@
+syllabus_skill,job_skill,true_label
+Python programming,Python,1
+object-oriented programming,Java,0
+relational database design,SQL,1
+machine learning,Machine learning,1
+web development,React,0
+version control with Git,Git,1
+data structures and algorithms,Kubernetes,0
+cloud computing fundamentals,Amazon Web Services,1
