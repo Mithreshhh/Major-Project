@@ -29,6 +29,9 @@ export default function Navbar() {
             <NavLink to="/dashboard" className={linkClass}>
               Dashboard
             </NavLink>
+            <NavLink to="/compare" className={linkClass}>
+              Compare
+            </NavLink>
             <div className="navbar__user">
               <span className="navbar__email">{user?.email}</span>
               <button type="button" className="btn btn--ghost btn--sm" onClick={handleLogout}>

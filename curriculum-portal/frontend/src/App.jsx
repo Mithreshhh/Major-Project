@@ -9,6 +9,7 @@ import SignupPage from './pages/SignupPage.jsx';
 import UploadPage from './pages/UploadPage.jsx';
 import ReportPage from './pages/ReportPage.jsx';
 import DashboardPage from './pages/DashboardPage.jsx';
+import ComparePage from './pages/ComparePage.jsx';
 
 export default function App() {
   return (
@@ -31,6 +32,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <DashboardPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/compare"
+            element={
+              <ProtectedRoute>
+                <ComparePage />
               </ProtectedRoute>
             }
           />
