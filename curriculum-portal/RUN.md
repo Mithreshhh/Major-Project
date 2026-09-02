@@ -78,11 +78,15 @@ scores a syllabus *against* them, so `/analyze` refuses to run without
 ```bash
 pip install -r requirements.txt
 
-# Job-market skills, from a real O*NET "Technology Skills" export.
+# Job-market skills, from a real O*NET export.
 # Required — the nlp-engine reports itself "not ready" while this is empty.
 # Download the tab-delimited O*NET database from https://www.onetcenter.org/database.html
-# and put "Technology Skills.txt" in this directory.
-python import_onet.py --file "Technology Skills.txt"
+# and put these files in database/onet_raw/ (gitignored):
+#   Technology Skills.txt   (required)  — concrete tools: Python, Git, AWS
+#   Skills.txt              (optional)  — worker skills: Programming, Critical Thinking
+#   Occupation Data.txt     (optional)  — resolves SOC codes for Skills.txt
+python fetch_and_import_onet.py --dry-run    # preview first — no DB writes
+python fetch_and_import_onet.py
 
 # NEP competency reference set, derived from the policy document itself.
 # Safe to re-run; use --truncate to replace an edited set.
@@ -260,7 +264,8 @@ check those first. The status code tells you whose problem it is:
 |---|---|
 | `POST /api/upload` → 401 | Not logged in, or the session was cleared by a page refresh |
 | `POST /api/upload` → 503 "uploads are paused" | `nlp-engine` isn't running, or is still loading models. Check `GET /api/health/nlp` |
-| `/health` shows `job_skills: empty` | `import_onet.py` hasn't been run — `/analyze` can't score anything |
+| `/health` shows `job_skills: empty` | `fetch_and_import_onet.py` hasn't been run — `/analyze` can't score anything |
+| O*NET import reports "no O*NET occupation matched" | That job title doesn't exist in the SOC taxonomy, or was renamed in this release — edit `TARGET_OCCUPATIONS` |
 | Report shows a blank NEP gauge | `nep_competencies` is empty — run `python database/seed_nep.py` |
 | `/health` shows `database: error` but the backend works fine | The two services point at **different** Postgres instances — compare `DATABASE_URL` in `backend/.env` and `nlp-engine/.env`, and see the Windows port gotcha in step 1 |
 | `/health` shows `models: error` | The spaCy model isn't installed — `python -m spacy download en_core_web_sm` |

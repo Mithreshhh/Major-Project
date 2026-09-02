@@ -49,7 +49,8 @@ score:
 ```bash
 cd database
 pip install -r requirements.txt
-python import_onet.py --file "Technology Skills.txt"   # job-market skills (O*NET export)
+python fetch_and_import_onet.py --dry-run               # preview the O*NET import
+python fetch_and_import_onet.py                         # job-market skills (O*NET export)
 python seed_nep.py                                      # NEP competencies (from the policy PDF)
 ```
 
