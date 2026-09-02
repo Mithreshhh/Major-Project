@@ -47,8 +47,11 @@ export default function DashboardPage() {
       <div className="dashboard-header">
         <div>
           <span className="eyebrow">Your institute</span>
-          <h1 className="page-title">Report Dashboard</h1>
-          <p className="page-subtitle">All past syllabus submissions and their gap analysis scores.</p>
+          <h1 className="page-title">Reports</h1>
+          <p className="page-subtitle">
+            Every syllabus you&apos;ve analyzed, newest first. Each figure is a gap score —
+            the share of job-market demand not covered, so lower is better.
+          </p>
         </div>
         <Link to="/" className="btn btn--primary">
           + Upload syllabus
@@ -69,8 +72,10 @@ export default function DashboardPage() {
 
       {status === 'ready' && reports.length === 0 && (
         <div className="glass-panel empty-state">
-          <p className="empty-state__title">No submissions yet</p>
-          <p className="empty-state__hint">Upload your first syllabus to see it appear here.</p>
+          <p className="empty-state__title">Nothing analyzed yet</p>
+          <p className="empty-state__hint">
+            Upload a syllabus and its gap analysis will appear here within a minute.
+          </p>
           <Link to="/" className="btn btn--primary" style={{ marginTop: '1.25rem' }}>
             Upload a syllabus
           </Link>
@@ -97,7 +102,7 @@ export default function DashboardPage() {
                 />
               </div>
               <div className="report-card__meta">
-                <span>Gap score</span>
+                <span>Gap</span>
                 <span>
                   {report.createdAt
                     ? new Date(report.createdAt).toLocaleDateString(undefined, {

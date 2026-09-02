@@ -67,7 +67,7 @@ export default function ReportPage() {
   return (
     <div className="page">
       <span className="eyebrow">Gap analysis report</span>
-      <h1 className="page-title">{report.filename}</h1>
+      <h1 className="page-title page-title--file">{report.filename}</h1>
       <p className="page-subtitle">
         {createdAt
           ? `Analyzed ${createdAt.toLocaleDateString(undefined, {
@@ -82,20 +82,22 @@ export default function ReportPage() {
         <div className="glass-panel score-card">
           <GapScoreGauge score={report.gapScore} label="Gap Score" />
           <p className="score-card__caption">
-            Percentage of job-market skills not covered by this syllabus
+            Share of job-market skills this syllabus doesn&apos;t cover. Lower is better.
           </p>
         </div>
 
         <div className="glass-panel score-card">
           <GapScoreGauge score={report.nepScore} label="NEP Score" invert />
-          <p className="score-card__caption">Alignment with National Education Policy competencies</p>
+          <p className="score-card__caption">
+            Share of NEP 2020 competencies the syllabus covers. Higher is better.
+          </p>
         </div>
       </div>
 
       <div className="skills-grid">
         <section className="glass-panel skills-panel">
           <h2 className="skills-panel__title skills-panel__title--matched">
-            Matched Skills <span className="skills-panel__count">{matchedSkills.length}</span>
+            Matched <span className="skills-panel__count">{matchedSkills.length}</span>
           </h2>
           {matchedSkills.length > 0 ? (
             <div className="tag-cloud">
@@ -106,13 +108,13 @@ export default function ReportPage() {
               ))}
             </div>
           ) : (
-            <p className="skills-panel__empty">No job-market skills matched this syllabus.</p>
+            <p className="skills-panel__empty">Nothing in this syllabus matched the job-market skill set.</p>
           )}
         </section>
 
         <section className="glass-panel skills-panel">
           <h2 className="skills-panel__title skills-panel__title--missing">
-            Missing Skills <span className="skills-panel__count">{missingSkills.length}</span>
+            Missing <span className="skills-panel__count">{missingSkills.length}</span>
           </h2>
           {missingSkills.length > 0 ? (
             <div className="tag-cloud">
@@ -123,7 +125,7 @@ export default function ReportPage() {
               ))}
             </div>
           ) : (
-            <p className="skills-panel__empty">No gaps found — full coverage.</p>
+            <p className="skills-panel__empty">No gaps — this syllabus covers the full job-market skill set.</p>
           )}
         </section>
       </div>
