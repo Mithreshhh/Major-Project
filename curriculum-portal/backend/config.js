@@ -50,3 +50,10 @@ export const NLP_HEALTH_CACHE_MS = readPositiveInt('NLP_HEALTH_CACHE_MS', 5_000)
 // clear 503 instead of after a full upload. Set false to skip the pre-flight
 // check and let the analyze call itself surface the failure.
 export const REQUIRE_NLP_READY = (process.env.REQUIRE_NLP_READY ?? 'true').toLowerCase() !== 'false';
+
+// GET /api/compare returns sample institutes instead of querying the
+// database. Defaults to true while the comparison view is being built against
+// mock data; set false to run the real query in services/compareInstitutes.js.
+// The response always reports which source it used, so a mock payload can't
+// be mistaken for live data downstream.
+export const COMPARE_USE_MOCK = (process.env.COMPARE_USE_MOCK ?? 'true').toLowerCase() !== 'false';

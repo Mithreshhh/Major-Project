@@ -8,6 +8,7 @@ import uploadRouter from './routes/upload.js';
 import analyzeRouter from './routes/analyze.js';
 import reportRouter from './routes/report.js';
 import reportsRouter from './routes/reports.js';
+import compareRouter from './routes/compare.js';
 import { NLP_ENGINE_URL, REQUIRE_NLP_READY } from './config.js';
 import { checkNlpHealth } from './services/nlpClient.js';
 
@@ -27,6 +28,7 @@ app.use('/api/upload', uploadRouter);
 app.use('/api/analyze', analyzeRouter);
 app.use('/api/report', reportRouter);
 app.use('/api/reports', reportsRouter);
+app.use('/api/compare', compareRouter);
 
 app.listen(PORT, () => {
   console.log(`Backend API listening on http://localhost:${PORT}`);
