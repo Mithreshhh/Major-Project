@@ -18,3 +18,6 @@ venv/
 # OS
 .DS_Store
 Thumbs.db
+
+# O*NET database exports (large third-party data dumps, downloaded locally)
+curriculum-portal/database/onet_raw/
