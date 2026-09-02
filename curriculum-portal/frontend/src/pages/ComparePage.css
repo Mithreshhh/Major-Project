@@ -1,0 +1,264 @@
+.compare-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.compare-mock-banner {
+  margin-top: 1.75rem;
+}
+
+/* --- Score tones ---------------------------------------------------------
+   Shared by the chart bars and the table pills so one score never reads as
+   two different colours in the two views. */
+.tone-good {
+  --tone: var(--color-success);
+  --tone-bg: var(--color-success-bg);
+}
+.tone-mid {
+  --tone: var(--color-warning);
+  --tone-bg: var(--color-warning-bg);
+}
+.tone-bad {
+  --tone: var(--color-danger);
+  --tone-bg: var(--color-danger-bg);
+}
+.tone-none {
+  --tone: var(--text-muted);
+  --tone-bg: var(--accent-soft);
+}
+
+/* --- Bar chart ----------------------------------------------------------- */
+
+.compare-chart {
+  margin-top: 1.75rem;
+  padding: 1.5rem 1.75rem;
+}
+
+.compare-chart__note {
+  margin: 0 0 1.25rem;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+.compare-chart__swatch {
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+  margin-right: 0.1rem;
+  border-radius: 3px;
+  background: var(--tone);
+  vertical-align: -1px;
+}
+
+.compare-chart__row {
+  display: grid;
+  grid-template-columns: minmax(120px, 180px) 1fr;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.5rem 0;
+}
+
+.compare-chart__row + .compare-chart__row {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.compare-chart__name {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compare-chart__bars {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+/* label | bar | value - a fixed label and value column keep every bar in the
+   panel starting and ending at the same x, so lengths stay comparable. */
+.compare-chart__metric {
+  display: grid;
+  grid-template-columns: 2.2rem 1fr 3rem;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.compare-chart__metric-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.compare-chart__track {
+  position: relative;
+  height: 20px;
+  background: var(--accent-soft);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+}
+
+.compare-chart__bar {
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: var(--tone, var(--accent));
+  /* Width is the animated property; transitioning `all` here would also
+     animate the colour when a sort reorders rows, which reads as a flicker. */
+  transition: width 600ms var(--ease-out);
+}
+
+.compare-chart__value {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  text-align: right;
+}
+
+/* --- Table --------------------------------------------------------------- */
+
+.compare-table-wrap {
+  margin-top: 1.5rem;
+  padding: 0.5rem 0.5rem 0.75rem;
+  /* The table has a sensible min-width; on a narrow screen it scrolls inside
+     this panel rather than forcing the whole page to scroll sideways. */
+  overflow-x: auto;
+}
+
+.compare-table {
+  width: 100%;
+  min-width: 620px;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.compare-table__caption {
+  caption-side: top;
+  text-align: left;
+  padding: 0.75rem 1rem 1rem;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.compare-table th,
+.compare-table td {
+  padding: 0.7rem 1rem;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.compare-table th.is-numeric,
+.compare-table td.is-numeric {
+  text-align: right;
+}
+
+.compare-table thead th {
+  border-bottom: 1px solid var(--border-strong);
+}
+
+.compare-table tbody tr + tr td {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.compare-table tbody tr:hover td {
+  background: var(--accent-soft);
+}
+
+.compare-table__sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  transition: color 150ms var(--ease-out);
+}
+
+.compare-table th.is-numeric .compare-table__sort {
+  flex-direction: row-reverse;
+}
+
+.compare-table__sort:hover {
+  color: var(--text-primary);
+}
+
+.compare-table__sort.is-active {
+  color: var(--text-primary);
+}
+
+.compare-table__arrow {
+  font-size: 0.6rem;
+  opacity: 0.5;
+}
+
+.compare-table__sort.is-active .compare-table__arrow {
+  opacity: 1;
+}
+
+.compare-table__name {
+  display: block;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.compare-table__sub {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.compare-pill {
+  display: inline-block;
+  min-width: 3.4rem;
+  padding: 0.25rem 0.6rem;
+  border-radius: var(--radius-pill);
+  background: var(--tone-bg);
+  color: var(--tone);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.compare-table__count {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.3rem;
+  min-width: 3rem;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.compare-table__count-bar {
+  display: block;
+  height: 3px;
+  min-width: 3px;
+  border-radius: var(--radius-pill);
+  background: var(--border-strong);
+}
+
+@media (max-width: 640px) {
+  .compare-chart__row {
+    grid-template-columns: 1fr;
+    gap: 0.4rem;
+  }
+
+  .compare-chart {
+    padding: 1.25rem 1rem;
+  }
+}
