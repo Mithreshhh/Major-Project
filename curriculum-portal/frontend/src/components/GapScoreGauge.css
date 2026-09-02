@@ -6,11 +6,13 @@
 }
 
 .gauge__track {
-  stroke: var(--bg-panel-strong);
+  /* A flat panel-strong fill would vanish against the card; a low-alpha
+     white keeps the unfilled arc legible on any surface value. */
+  stroke: rgba(255, 255, 255, 0.07);
 }
 
 .gauge__fill {
-  transition: stroke-dashoffset 1.1s var(--ease-out), stroke 0.4s var(--ease-out);
+  transition: stroke-dashoffset 1.2s var(--ease-out), stroke 0.4s var(--ease-out);
 }
 
 .gauge__center {
@@ -21,20 +23,23 @@
   align-items: center;
   justify-content: center;
   text-align: center;
-  gap: 0.15rem;
+  gap: 0.35rem;
 }
 
 .gauge__value {
   font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 1.9rem;
+  font-weight: 600;
+  font-size: 2.15rem;
   line-height: 1;
+  letter-spacing: -0.045em;
+  color: var(--text-primary);
 }
 
 .gauge__label {
-  font-size: 0.72rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 500;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
   color: var(--text-muted);
 }

@@ -7,8 +7,8 @@
 }
 
 .empty-state {
-  margin-top: 2rem;
-  padding: 3.5rem 2rem;
+  margin-top: 2.5rem;
+  padding: 4rem 2rem;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -16,28 +16,31 @@
 }
 
 .empty-state__title {
+  font-family: var(--font-display);
   font-size: 1.15rem;
-  font-weight: 600;
+  font-weight: 500;
+  letter-spacing: -0.02em;
   color: var(--text-primary);
 }
 
 .empty-state__hint {
-  margin-top: 0.4rem;
+  margin-top: 0.5rem;
   font-size: 0.9rem;
+  max-width: 36ch;
 }
 
 .report-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 1.1rem;
-  margin-top: 2rem;
+  grid-template-columns: repeat(auto-fill, minmax(272px, 1fr));
+  gap: 1rem;
+  margin-top: 2.5rem;
 }
 
 .report-card {
   display: flex;
   flex-direction: column;
-  gap: 0.9rem;
-  padding: 1.5rem;
+  gap: 1.15rem;
+  padding: 1.5rem 1.5rem 1.35rem;
   text-align: left;
   cursor: pointer;
   background: var(--bg-panel);
@@ -49,21 +52,29 @@
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 0.75rem;
+  gap: 1rem;
 }
 
 .report-card__filename {
-  font-weight: 600;
-  font-size: 0.98rem;
-  word-break: break-word;
   font-family: var(--font-mono);
-  font-size: 0.85rem;
+  font-size: 0.8rem;
+  font-weight: 400;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  word-break: break-word;
+  transition: color 0.2s var(--ease-out);
+}
+
+.report-card:hover .report-card__filename {
+  color: var(--text-primary);
 }
 
 .report-card__score {
   font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 1.4rem;
+  font-weight: 600;
+  font-size: 1.85rem;
+  line-height: 1;
+  letter-spacing: -0.035em;
   flex-shrink: 0;
 }
 
@@ -80,16 +91,16 @@
 }
 
 .report-card__bar {
-  height: 6px;
+  height: 3px;
   border-radius: var(--radius-pill);
-  background: var(--bg-panel-strong);
+  background: var(--accent-soft);
   overflow: hidden;
 }
 
 .report-card__bar-fill {
   height: 100%;
   border-radius: var(--radius-pill);
-  transition: width 0.8s var(--ease-out);
+  transition: width 0.9s var(--ease-out);
 }
 
 .report-card.tone-good .report-card__bar-fill {
@@ -107,8 +118,10 @@
 .report-card__meta {
   display: flex;
   justify-content: space-between;
-  font-size: 0.78rem;
+  align-items: baseline;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
   color: var(--text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.14em;
 }
